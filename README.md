@@ -46,7 +46,9 @@ Simply open a terminal from any existing Linux system and run `sudo ./nixpwnbox.
 
 Example: `sudo ./nixpwnbox.sh /dev/sda America Los_Angeles "en_US.UTF-8" btrfs someuser "Some User" some-host`
 
-## Installation from ISO image: TODO
+## Installation from ISO image
+
+`./mkisoimage.sh`
 
 ## Contributing
 
