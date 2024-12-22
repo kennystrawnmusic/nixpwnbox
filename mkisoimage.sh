@@ -13,6 +13,12 @@ if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ]; then
   nix-env -iA nixpkgs.nixos-install-tools
 fi
 
+# Detect if we're running on a live image and update location of configuration.nix accordingly
+if [ ! -f ./README.md ] && [ ! -f ./configuration.nix ] && [ -f /etc/nixos/configuration-template.nix ]
+then
+  cp /etc/nixos/configuration-template.nix ./configuration.nix
+fi
+
 # Generate the ISO image
 nix-build '<nixpkgs/nixos>' -A config.system.build.isoImage -I nixos-config=iso.nix
 
@@ -34,4 +40,10 @@ if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ]; then
 
   # Uninstall Nix packages from host
   rm -rf /etc/nix /etc/profile.d/nix.sh /etc/tmpfiles.d/nix-daemon.conf /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile
+fi
+
+# Cleanup PWD if running on live image
+if [ -f /etc/nixos/configuration-template.nix ] && [ -f ./configuration.nix ] && [ ! -f ./README.md ]
+then
+  rm ./configuration.nix
 fi
