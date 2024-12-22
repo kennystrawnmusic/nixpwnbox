@@ -77,11 +77,11 @@ in
     edition = "plasma6-htb";
     contents = [
       {
-        source = /etc/nixos/configuration.nix;
+        source = ./configuration.nix;
         target = "/etc/nixos/configuration.nix";
       }
       {
-        source = /home/liveuser/Desktop/iso.nix;
+        source = ./Desktop/iso.nix;
         target = "/home/liveuser/Desktop/iso.nix";
       }
       {
