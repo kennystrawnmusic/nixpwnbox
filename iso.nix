@@ -78,7 +78,7 @@ in
     contents = [
       {
         source = ./configuration.nix;
-        target = "/etc/nixos/configuration.nix";
+        target = "/etc/nixos/configuration-template.nix";
       }
       {
         source = ./iso.nix;
@@ -1453,7 +1453,7 @@ in
 
     # Download configuration template
     mkdir -p /mnt/etc/nixos
-    wget -O /mnt/etc/nixos/configuration.nix https://gist.githubusercontent.com/kennystrawnmusic/05e6bcea71e2d08f2414b9681b2b0de8/raw/4a18e5a9a78d47738ebacb9126e8a9fedd6eae91/configuration.nix
+    cp /etc/nixos/configuration-template.nix /mnt/etc/nixos/configuration.nix
 
     sed -i "s/@@username@@/$user/g" /mnt/etc/nixos/configuration.nix
     sed -i "s/@@tz-major@@\/@@tz-minor@@/$tz_major\/$tz_minor/g" /mnt/etc/nixos/configuration.nix
