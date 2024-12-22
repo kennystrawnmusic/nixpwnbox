@@ -43,6 +43,8 @@ Simply open a terminal from any existing Linux system and run `sudo ./nixpwnbox.
 
 Example: `sudo ./nixpwnbox.sh /dev/sda America Los_Angeles "en_US.UTF-8" btrfs someuser "Some User" some-host`
 
+## Installation from ISO image: TODO
+
 ## Contributing
 
 1. If you find that there's a tool missing from the default configuration that should be in it, feel free to either submit a pull request or report an issue. I'll gladly take as much feedback as possible.
