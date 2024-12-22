@@ -51,4 +51,4 @@ Example: `sudo ./nixpwnbox.sh /dev/sda America Los_Angeles "en_US.UTF-8" btrfs s
 ## Contributing
 
 1. If you find that there's a tool missing from the default configuration that should be in it, feel free to either submit a pull request or report an issue. I'll gladly take as much feedback as possible.
-2. Feel free to 
+2. Feel free to report any bugs or installation failures that may arise under the Issues tab, as well as ask any questions under the Discussions tab
