@@ -81,7 +81,7 @@ in
         target = "/etc/nixos/configuration.nix";
       }
       {
-        source = ./Desktop/iso.nix;
+        source = ./iso.nix;
         target = "/home/liveuser/Desktop/iso.nix";
       }
       {
