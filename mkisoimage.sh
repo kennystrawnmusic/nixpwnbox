@@ -16,10 +16,6 @@ fi
 # Generate the ISO image
 nix-build '<nixpkgs/nixos>' -A config.system.build.isoImage -I nixos-config=iso.nix
 
-# Actually install the target system
-nixos-generate-config --root /mnt
-nixos-install -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/master.tar.gz -I nixos=https://github.com/NixOS/nixpkgs/archive/master.tar.gz
-
 # Cleanup if on a non-NixOS host
 if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ]; then
 

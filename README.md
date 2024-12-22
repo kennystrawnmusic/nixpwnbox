@@ -48,7 +48,7 @@ Example: `sudo ./nixpwnbox.sh /dev/sda America Los_Angeles "en_US.UTF-8" btrfs s
 
 ## Installation from ISO image
 
-`./mkisoimage.sh`
+`./mkisoimage.sh` (unlike the install script, this one doesn't need any arguments)
 
 ## Contributing
 
