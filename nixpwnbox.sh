@@ -120,7 +120,7 @@ sed -i "s/@@username@@/$user/g" /mnt/etc/nixos/configuration.nix
 sed -i "s/@@tz-major@@\/@@tz-minor@@/$tz_major\/$tz_minor/g" /mnt/etc/nixos/configuration.nix
 sed -i "s/@@lang@@/$locale/g" /mnt/etc/nixos/configuration.nix
 sed -i "s/@@fullname@@/$nickname/g" /mnt/etc/nixos/configuration.nix
-sed -i "s/@@hostname/$hostname/g" /mnt/etc/nixos/configuration.nix
+sed -i "s/@@hostname@@/$hostname/g" /mnt/etc/nixos/configuration.nix
 
 if [ "$file_system" != "btrfs" ]; then
   sed -i "s/btrfs/$file_system/g" /mnt/etc/nixos/configuration.nix
