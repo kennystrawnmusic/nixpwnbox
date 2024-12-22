@@ -85,6 +85,10 @@ in
         target = "/home/liveuser/Desktop/iso.nix";
       }
       {
+        source = ./mkisoimage.sh;
+        target = "/home/liveuser/Desktop/mkisoimage.sh";
+      }
+      {
         source = desktopBackground;
         target = "/etc/htb/hackthebox.jpg";
       }
