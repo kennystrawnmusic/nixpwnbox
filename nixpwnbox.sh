@@ -112,7 +112,7 @@ if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ]; then
   nix-env -iA nixpkgs.nixos-install-tools
 fi
 
-# Download configuration template
+# Copy configuration template
 mkdir -p /mnt/etc/nixos
 cp ./configuration.nix /mnt/etc/nixos/configuration.nix
 
