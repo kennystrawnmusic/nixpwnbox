@@ -87,12 +87,12 @@ in
       {
         source = ./mkisoimage.sh;
         target = "/home/liveuser/Desktop/mkisoimage.sh";
-        mode = "0755";
+        mode = "4755";
       }
       {
         source = ./nixpwnbox.sh;
         target = "/etc/htb/install.sh";
-        mode = "0755";
+        mode = "4755";
       }
       {
         source = desktopBackground;
