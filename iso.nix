@@ -1455,11 +1455,11 @@ in
     mkdir -p /mnt/etc/nixos
     wget -O /mnt/etc/nixos/configuration.nix https://gist.githubusercontent.com/kennystrawnmusic/05e6bcea71e2d08f2414b9681b2b0de8/raw/4a18e5a9a78d47738ebacb9126e8a9fedd6eae91/configuration.nix
 
-    sed -i "s/htb-ac-1424625/$user/g" /mnt/etc/nixos/configuration.nix
-    sed -i "s/America\/Los_Angeles/$tz_major\/$tz_minor/g" /mnt/etc/nixos/configuration.nix
-    sed -i "s/en_US\.UTF-8/$locale/g" /mnt/etc/nixos/configuration.nix
-    sed -i "s/Kenny\ Strawn/$nickname/g" /mnt/etc/nixos/configuration.nix
-    sed -i "s/kennystrawnmusic-pwnaegisr2/$hostname/g" /mnt/etc/nixos/configuration.nix
+    sed -i "s/@@username@@/$user/g" /mnt/etc/nixos/configuration.nix
+    sed -i "s/@@tz-major@@\/@@tz-minor@@/$tz_major\/$tz_minor/g" /mnt/etc/nixos/configuration.nix
+    sed -i "s/@@lang@@/$locale/g" /mnt/etc/nixos/configuration.nix
+    sed -i "s/@@fullname@@/$nickname/g" /mnt/etc/nixos/configuration.nix
+    sed -i "s/@@hostname@@/$hostname/g" /mnt/etc/nixos/configuration.nix
 
     # Actually install the target system
     nixos-generate-config --root /mnt
