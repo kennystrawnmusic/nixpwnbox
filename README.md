@@ -40,7 +40,7 @@ Simply open a terminal from any existing Linux system and run `sudo ./nixpwnbox.
 3. Second half of your time zone path (e.g. "Los_Angeles", "New_York")
 4. Locale (e.g. "en_US.UTF-8")
 5. File system you plan to use for the root (e.g. "btrfs", "bcachefs", "ext4")
-6. Username (e.g. "htb-ac-<ID>")
+6. Username (e.g. "htb-ac-`ID`")
 7. Full name
 8. Computer name
 
