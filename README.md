@@ -16,17 +16,20 @@ Unlike the official HTB PwnBox, however, NixPwnBox uses KDE Plasma 6 instead of 
 
 ## What it looks like
 
-Desktop:
+### Desktop:
 ![desktop](https://github.com/user-attachments/assets/ca1886e7-1633-4d9a-b207-213a0c1c2469)
 
-Desktop with Kickoff (app menu) and Konsole (terminal) open:
+### Desktop with Kickoff (app menu) and Konsole (terminal) open:
 ![kickoff](https://github.com/user-attachments/assets/3beab073-3c4a-44ef-a6ec-5ecd87bb0a0f)
 
-`uname -a` output (note the 6.12 kernel):
+### `uname -a` output (note the 6.12 kernel):
 ![uname](https://github.com/user-attachments/assets/181d730e-b362-4c16-b66d-78ef0a4ff5f1)
 
-ZAP 2.15:
+### ZAP 2.15
 ![zaproxy215](https://github.com/user-attachments/assets/6fe79986-cef6-42b8-8899-c0d293a01b43)
+
+### Overview Mode
+![overview](https://github.com/user-attachments/assets/f48b4957-d74b-4e48-bc3c-4fd22fc5e099)
 
 ## Installation (from existing Linux systems)
 
