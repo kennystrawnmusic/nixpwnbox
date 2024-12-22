@@ -48,7 +48,7 @@ Example: `sudo ./nixpwnbox.sh /dev/sda America Los_Angeles "en_US.UTF-8" btrfs s
 
 ## Installation from ISO image
 
-`./mkisoimage.sh` (unlike the install script, this one doesn't need any arguments)
+`./mkisoimage.sh` (unlike the install script, this one doesn't need any arguments), then flash the resulting ISO image to a drive using `dd` and install either with `/etc/htb/install.sh` (same syntax as the above) or with Calamares (untested!) from it.
 
 ## Contributing
 
