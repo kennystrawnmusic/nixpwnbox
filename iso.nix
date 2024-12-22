@@ -1355,7 +1355,6 @@ in
 
   environment.etc."htb/vpnserver.sh".mode = "0755";
   environment.etc."htb/vpnbash.sh".mode = "0755";
-  environment.etc."htb/install.sh".mode = "0755";
 
   # Keep USB mice and keyboards awake at all times
   services.udev.extraRules = ''
