@@ -93,6 +93,7 @@ then
   mount -t $file_system -o subvol='@' $partition2 /mnt
   mkdir /mnt/home
   mount -t $file_system -o subvol='@home' $partition2 /mnt/home
+  cd $script_working_directory
 fi
 
 if [ $? -ne 0 ]; then
