@@ -272,7 +272,7 @@ in
 
   # Enable sound with pipewire.
 #   sound.enable = true;
-  hardware.pulseaudio.enable = lib.mkForce false;
+  services.pulseaudio.enable = lib.mkOverride 0 false;
   security.rtkit.enable = true;
   services.pipewire = {
     enable = true;
@@ -851,7 +851,7 @@ in
     kdePackages.sonnet
     kdePackages.spacebar
     kdePackages.spectacle
-    kdePackages.stdenv
+#    kdePackages.stdenv
     kdePackages.step
     kdePackages.svgpart
     kdePackages.sweeper
@@ -930,7 +930,7 @@ in
     extundelete
     ghidra-bin
     git
-    p0f
+#    p0f
     pdf-parser
     regripper
     sleuthkit
@@ -966,9 +966,62 @@ in
       pypkgs.beautifulsoup4
       pypkgs.pygobject3
       pypkgs.scapy
-      pypkgs.impacket
+#      pypkgs.impacket # See custom packages below; using more bleeding-edge version than what's in the repositories
       pypkgs.xsser
       pypkgs.pypykatz
+      
+      # Bleeding-Edge Impacket
+      (pypkgs.buildPythonPackage rec {
+        pname = "impacket";
+        version = "0.13.0.dev0+20250307.160229.6e0a969";
+        pyproject = true;
+
+        disabled = pypkgs.pythonOlder "3.8";
+
+        src = builtins.fetchGit {
+          url = "https://github.com/fortra/impacket";
+          ref = "master";
+        };
+
+        pythonRelaxDeps = [ "pyopenssl" ];
+
+        build-system = [ pypkgs.setuptools ];
+
+        dependencies = with pypkgs; [
+          charset-normalizer
+          dsinternals
+          flask
+          ldap3
+          ldapdomaindump
+          pyasn1
+          pyasn1-modules
+          pycryptodomex
+          pyopenssl
+          setuptools
+          six
+        ];
+
+        nativeCheckInputs = [ pypkgs.pytestCheckHook ];
+
+        pythonImportsCheck = [ "impacket" ];
+
+        disabledTestPaths = [
+          # Skip all RPC related tests
+          "tests/dcerpc/"
+          "tests/SMB_RPC/"
+        ];
+
+        meta = with lib; {
+          description = "Network protocols Constructors and Dissectors";
+          homepage = "https://github.com/fortra/impacket";
+          changelog =
+            "https://github.com/fortra/impacket/releases/tag/impacket_"
+            + replaceStrings [ "." ] [ "_" ] version;
+          # Modified Apache Software License, Version 1.1
+          license = licenses.free;
+          maintainers = with maintainers; [ kennystrawnmusic ];
+        };
+      })
     ]))
 
     # Pentesting, Part 7: Pivoting
