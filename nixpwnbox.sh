@@ -139,7 +139,7 @@ if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ]; then
   systemctl daemon-reload
 
   # Remove "nixbld*" users
-  for i in $(seq 1 32); do
+  for i in $(seq 1 $(nproc)); do
       userdel nixbld$i
   done
   groupdel nixbld
