@@ -386,7 +386,7 @@ in
     # Force this package to not use the defunct ftpmirror.gnu.org download link
     (libunistring.overrideAttrs(_: rec {
       src = pkgs.fetchurl {
-        url = "https://ftp.gnu.org/gnu/libunistring/libunistring-1.2.tar.gz";
+        url = "https://ftp.gnu.org/gnu/libunistring/libunistring-latest.tar.gz";
         sha256 = "sha256-/W1WYvpwZIfEg0mnWLV7wUnOlOxsMGJOyf3Ec86rvI4=";
       };
     }))
