@@ -20,7 +20,7 @@ let
   prepkgs = import <nixpkgs> { };
 
   impacketsrc = builtins.fetchGit {
-    url = "https://github.com/fortra/impacket";
+    url = "https://github.com/fortra/impacket.git";
     ref = "master";
   };
 
@@ -42,10 +42,19 @@ let
   pre   = getVal "VER_PREREL";
 
   baseVersion = "${maj}.${min}.${patch}";
+
+  lmd          = prepkgs.srcInfo.lastModifiedDate or null;
+  shortRev     = prepkgs.lib.substring 0 7 prepkgs.srcInfo.rev;
+  ymd          = if lmd != null then builtins.substring 0 10 lmd else null;            # "YYYY-MM-DD"
+  hms          = if lmd != null then builtins.substring 11 8 lmd else null;            # "HH:MM:SS"
+  ymdCompact   = if ymd != null then builtins.replaceStrings [ "-" ] [ "" ] ymd else null;  # "YYYYMMDD"
+  hmsCompact   = if hms != null then builtins.replaceStrings [ ":" ] [ "" ] hms else null;  # "HHMMSS"
+  localSuffix  = if ymdCompact != null && hmsCompact != null then "+${ymdCompact}.${hmsCompact}.${shortRev}" else "";
+
   impacketversion =
     if pre != null && pre != "" && pre != "final"
-    then "${baseVersion}.${pre}"   # upstream often appends ".dev", etc.
-    else baseVersion;
+    then "${baseVersion}.${pre}${localSuffix}"
+    else "${baseVersion}";
 in
 {
   config,
