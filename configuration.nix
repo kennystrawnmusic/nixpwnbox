@@ -394,6 +394,9 @@ in
     # System Administration
     pv
 
+    # Synack
+    omnissa-horizon-client
+
     # KDE
     kdePackages.accounts-qt
     kdePackages.akonadi
@@ -960,68 +963,13 @@ in
 
     # Pentesting, Part 6: Python
     (python3.withPackages(pypkgs: [
-#      pypkgs.binwalk-full # Removed from repositories
-#      pypkgs.distorm3     # NixOS/nixpkgs#328346
+      pypkgs.distorm3     # NixOS/nixpkgs#328346
       pypkgs.requests
       pypkgs.beautifulsoup4
+      pypkgs.pipx
       pypkgs.pygobject3
       pypkgs.scapy
-#      pypkgs.impacket # See custom packages below; using more bleeding-edge version than what's in the repositories
       pypkgs.xsser
-      pypkgs.pypykatz
-      
-      # Bleeding-Edge Impacket
-      (pypkgs.buildPythonPackage rec {
-        pname = "impacket";
-        version = "0.13.0.dev0+20250307.160229.6e0a969";
-        pyproject = true;
-
-        disabled = pypkgs.pythonOlder "3.8";
-
-        src = builtins.fetchGit {
-          url = "https://github.com/fortra/impacket";
-          ref = "master";
-        };
-
-        pythonRelaxDeps = [ "pyopenssl" ];
-
-        build-system = [ pypkgs.setuptools ];
-
-        dependencies = with pypkgs; [
-          charset-normalizer
-          dsinternals
-          flask
-          ldap3
-          ldapdomaindump
-          pyasn1
-          pyasn1-modules
-          pycryptodomex
-          pyopenssl
-          setuptools
-          six
-        ];
-
-        nativeCheckInputs = [ pypkgs.pytestCheckHook ];
-
-        pythonImportsCheck = [ "impacket" ];
-
-        disabledTestPaths = [
-          # Skip all RPC related tests
-          "tests/dcerpc/"
-          "tests/SMB_RPC/"
-        ];
-
-        meta = with lib; {
-          description = "Network protocols Constructors and Dissectors";
-          homepage = "https://github.com/fortra/impacket";
-          changelog =
-            "https://github.com/fortra/impacket/releases/tag/impacket_"
-            + replaceStrings [ "." ] [ "_" ] version;
-          # Modified Apache Software License, Version 1.1
-          license = licenses.free;
-          maintainers = with maintainers; [ kennystrawnmusic ];
-        };
-      })
     ]))
 
     # Pentesting, Part 7: Pivoting
@@ -1105,6 +1053,73 @@ in
     wifite2
     wirelesstools
 
+    # Pentesting, Part 14: Active Directory
+    adidnsdump
+    adreaper
+    autobloody
+    breads-ad
+    certipy
+    coercer
+    kerbrute
+    netexec
+    powerview
+    (python3Packages.buildPythonPackage rec { # Bleeding edge Impacket
+      pname = "impacket";
+      version = builtins.readFile(pkgs.runCommand "impacketversion" { } "export PATH=${pkgs.python3}/bin:$PATH; git clone https://github.com/fortra/impacket; cd impacket; python3 -m venv .impacket; source .impacket/bin/activate; python3 -c 'from impacket import version; print(version.BANNER)' | cut -d ' ' -f2 > $out; deactivate; cd ..; rm -rf impacket";);
+      pyproject = true;
+
+      disabled = pypkgs.pythonOlder "3.8";
+
+      src = builtins.fetchGit {
+        url = "https://github.com/fortra/impacket";
+        ref = "master";
+      };
+
+      pythonRelaxDeps = [ "pyopenssl" ];
+
+      build-system = [ pypkgs.setuptools ];
+
+      dependencies = with pypkgs; [
+        charset-normalizer
+        dsinternals
+        flask
+        ldap3
+        ldapdomaindump
+        pyasn1
+        pyasn1-modules
+        pycryptodomex
+        pyopenssl
+        setuptools
+        six
+      ];
+
+      nativeCheckInputs = [ pypkgs.pytestCheckHook ];
+
+      pythonImportsCheck = [ "impacket" ];
+
+      disabledTestPaths = [
+        # Skip all RPC related tests
+        "tests/dcerpc/"
+        "tests/SMB_RPC/"
+      ];
+
+      meta = with lib; {
+        description = "Network protocols Constructors and Dissectors";
+        homepage = "https://github.com/fortra/impacket";
+        changelog =
+          "https://github.com/fortra/impacket/releases/tag/impacket_"
+          + replaceStrings [ "." ] [ "_" ] version;
+        # Modified Apache Software License, Version 1.1
+        license = licenses.free;
+        maintainers = with maintainers; [ kennystrawnmusic ];
+      };
+    })
+    python3Packages.lsassy
+    python3Packages.pypykatz
+    python3Packages.pywerview
+    samba
+    sccmhunter
+
     # Custom packages, Part 1: PwnXSS
     (pkgs.stdenv.mkDerivation rec {
       pname = "pwnxss";
@@ -1178,6 +1193,51 @@ in
 
         chmod a+x $out/bin/cupp
       '';
+    })
+
+    # Custom packages, Part 3: Sliver C2
+    ({ lib, stdenvNoCC, fetchurl }:
+    let
+      version = "1.5.43";
+
+      # Map Nix platforms to BishopFox artifact names.
+      plat =
+        if stdenvNoCC.hostPlatform.isLinux then "linux"
+        else if stdenvNoCC.hostPlatform.isDarwin then "darwin"
+        else throw "Unsupported OS for Sliver binaries";
+
+      arch =
+        if stdenvNoCC.hostPlatform.isx86_64 then "amd64"
+        else if stdenvNoCC.hostPlatform.isAarch64 then "arm64"
+        else throw "Unsupported CPU arch for Sliver binaries";
+
+      clientSrc = builtins.fetchurl "https://github.com/BishopFox/sliver/releases/download/v${version}/sliver-client_linux";
+      serverSrc = builtins.fetchurl "https://github.com/BishopFox/sliver/releases/download/v${version}/sliver-server_linux";
+    in
+    stdenvNoCC.mkDerivation rec {
+      pname = "sliver";
+      inherit version;
+
+      srcs = [ clientSrc serverSrc ];
+      dontUnpack = true;
+
+      installPhase = ''
+        mkdir -p $out/bin
+        # Archives contain the binaries at top-level named sliver-client/sliver-server
+        cp -v ${clientSrc} $out/bin/sliver-client
+        cp -v ${serverSrc} $out/bin/sliver-server
+        chmod +x $out/bin/sliver-*
+      '';
+
+      meta = with lib; {
+        description = "Sliver C2 (prebuilt binaries from upstream releases)";
+        homepage = "https://github.com/BishopFox/sliver";
+        license = licenses.gpl3Only; # upstream is GPL-3.0
+        platforms = platforms.unix;
+        # Not suitable for nixpkgs due to binary-only; fine for a personal overlay
+        maintainers = [];
+        mainProgram = "sliver-server";
+      };
     })
   ];
 

@@ -374,6 +374,14 @@ in
     }
   ];
 
+  environment.variables = {
+    RUSTUP_HOME = "/opt/rust";
+    CARGO_HOME = "/opt/rust";
+    PIPX_HOME = "/opt/pipx";
+    PIPX_GLOBAL_HOME = "/opt/pipx";
+    PIPX_BIN_DIR = "/usr/local/bin";
+  };
+
   environment.systemPackages = with pkgs; [
     # Essentials
     git
@@ -428,6 +436,9 @@ in
 
     # System Administration
     pv
+
+    # Synack
+    omnissa-horizon-client
 
     # KDE
     kdePackages.accounts-qt
@@ -1000,15 +1011,13 @@ in
 
     # Pentesting, Part 6: Python
     (python3.withPackages(pypkgs: [
-#      pypkgs.binwalk-full # Removed from repositories
-#      pypkgs.distorm3     # NixOS/nixpkgs#328346
+      pypkgs.distorm3     # NixOS/nixpkgs#328346
       pypkgs.requests
       pypkgs.beautifulsoup4
+      pypkgs.pipx
       pypkgs.pygobject3
       pypkgs.scapy
-      pypkgs.impacket
       pypkgs.xsser
-      pypkgs.pypykatz
     ]))
 
     # Pentesting, Part 7: Pivoting
@@ -1029,9 +1038,7 @@ in
     john
     phrasendrescher
     thc-hydra
-    netexec
     medusa
-    kerbrute
     responder
 
     # Pentesting, Part 9: Disassemblers
@@ -1091,6 +1098,73 @@ in
     redfang
     wifite2
     wirelesstools
+
+    # Pentesting, Part 14: Active Directory
+    adidnsdump
+    adreaper
+    autobloody
+    breads-ad
+    certipy
+    coercer
+    kerbrute
+    netexec
+    powerview
+    (python3Packages.buildPythonPackage rec { # Bleeding edge Impacket
+      pname = "impacket";
+      version = builtins.readFile(pkgs.runCommand "impacketversion" { } "export PATH=${pkgs.python3}/bin:$PATH; git clone https://github.com/fortra/impacket; cd impacket; python3 -m venv .impacket; source .impacket/bin/activate; python3 -c 'from impacket import version; print(version.BANNER)' | cut -d ' ' -f2 > $out; deactivate; cd ..; rm -rf impacket";);
+      pyproject = true;
+
+      disabled = pypkgs.pythonOlder "3.8";
+
+      src = builtins.fetchGit {
+        url = "https://github.com/fortra/impacket";
+        ref = "master";
+      };
+
+      pythonRelaxDeps = [ "pyopenssl" ];
+
+      build-system = [ pypkgs.setuptools ];
+
+      dependencies = with pypkgs; [
+        charset-normalizer
+        dsinternals
+        flask
+        ldap3
+        ldapdomaindump
+        pyasn1
+        pyasn1-modules
+        pycryptodomex
+        pyopenssl
+        setuptools
+        six
+      ];
+
+      nativeCheckInputs = [ pypkgs.pytestCheckHook ];
+
+      pythonImportsCheck = [ "impacket" ];
+
+      disabledTestPaths = [
+        # Skip all RPC related tests
+        "tests/dcerpc/"
+        "tests/SMB_RPC/"
+      ];
+
+      meta = with lib; {
+        description = "Network protocols Constructors and Dissectors";
+        homepage = "https://github.com/fortra/impacket";
+        changelog =
+          "https://github.com/fortra/impacket/releases/tag/impacket_"
+          + replaceStrings [ "." ] [ "_" ] version;
+        # Modified Apache Software License, Version 1.1
+        license = licenses.free;
+        maintainers = with maintainers; [ kennystrawnmusic ];
+      };
+    })
+    python3Packages.lsassy
+    python3Packages.pypykatz
+    python3Packages.pywerview
+    samba
+    sccmhunter
 
     # Custom packages, Part 1: PwnXSS
     (pkgs.stdenv.mkDerivation rec {
@@ -1167,7 +1241,52 @@ in
       '';
     })
 
-    # Custom packages, Part 3: Custom Calamares configuration
+    # Custom packages, Part 3: Sliver C2
+    ({ lib, stdenvNoCC, fetchurl }:
+    let
+      version = "1.5.43";
+
+      # Map Nix platforms to BishopFox artifact names.
+      plat =
+        if stdenvNoCC.hostPlatform.isLinux then "linux"
+        else if stdenvNoCC.hostPlatform.isDarwin then "darwin"
+        else throw "Unsupported OS for Sliver binaries";
+
+      arch =
+        if stdenvNoCC.hostPlatform.isx86_64 then "amd64"
+        else if stdenvNoCC.hostPlatform.isAarch64 then "arm64"
+        else throw "Unsupported CPU arch for Sliver binaries";
+
+      clientSrc = builtins.fetchurl "https://github.com/BishopFox/sliver/releases/download/v${version}/sliver-client_linux";
+      serverSrc = builtins.fetchurl "https://github.com/BishopFox/sliver/releases/download/v${version}/sliver-server_linux";
+    in
+    stdenvNoCC.mkDerivation rec {
+      pname = "sliver";
+      inherit version;
+
+      srcs = [ clientSrc serverSrc ];
+      dontUnpack = true;
+
+      installPhase = ''
+        mkdir -p $out/bin
+        # Archives contain the binaries at top-level named sliver-client/sliver-server
+        cp -v ${clientSrc} $out/bin/sliver-client
+        cp -v ${serverSrc} $out/bin/sliver-server
+        chmod +x $out/bin/sliver-*
+      '';
+
+      meta = with lib; {
+        description = "Sliver C2 (prebuilt binaries from upstream releases)";
+        homepage = "https://github.com/BishopFox/sliver";
+        license = licenses.gpl3Only; # upstream is GPL-3.0
+        platforms = platforms.unix;
+        # Not suitable for nixpkgs due to binary-only; fine for a personal overlay
+        maintainers = [];
+        mainProgram = "sliver-server";
+      };
+    })
+
+    # Custom packages, Part 4: Custom Calamares configuration
     (stdenv.mkDerivation (finalAttrs: {
       pname = "calamares-nixpwnbox";
       version = "0.3.19";
@@ -1253,8 +1372,6 @@ in
 
     # Ensure that Rust is installed in the correct (sysmtem-wide) location
     export CARGO_BUILD_JOBS=$(nproc)
-    export RUSTUP_HOME=/opt/rust
-    export CARGO_HOME=/opt/rust
 
     # Add Rust to $PATH if installed
     if [ -f /opt/rust/env ]; then
@@ -1405,250 +1522,252 @@ in
     backupFileExtension = "old";
     useGlobalPkgs = true;
 
-    users."${systemUser}" = { stdenv, fetchurl, lib, pkgs, ... }: {
-      home.stateVersion = config.system.stateVersion;
+    sharedModules = [
+      { stdenv, fetchurl, lib, pkgs, ... }: {
+        home.stateVersion = config.system.stateVersion;
 
-      imports = [
-        (import "${plasma-manager}/modules")
-      ];
-
-      services.home-manager.autoUpgrade.enable = config.system.autoUpgrade.enable;
-      services.home-manager.autoUpgrade.frequency = config.system.autoUpgrade.dates;
-
-      home.file."Desktop/Installation Instructions.txt".text = ''
-        To install system, open a terminal (Konsole) window and run: sudo /etc/htb/install.sh DEVICE TIME_ZONE_CONTINENT TIME_ZONE_CITY LOCALE FILE_SYSTEM USERNAME NICKNAME HOSTNAME
-
-        where:
-        * DEVICE is the device to install to,
-        * TIME_ZONE_CONTINENT is the part of your time zone identifier before the slash,
-        * TIME_ZONE_CITY is the part of your time zone identifier after the slash,
-        * LOCALE is your language locale identifier,
-        * FILE_SYSTEM is the file system you intend to use to format DEVICE,
-        * USERNAME is your username,
-        * NICKNAME is your properly capitalized and spaced real name,
-        * and HOSTNAME is what your computer will call itself on the network.
-
-        Example: sudo /etc/htb/install.sh /dev/sda America Los_Angeles "en_US.UTF-8" btrfs someuser "Some User" some-host
-      '';
-
-      programs.konsole = {
-        enable = true;
-        defaultProfile = "HTB";
-        profiles."HTB" = {
-
-          font = {
-            name = "Monospace";
-            size = 12;
-          };
-
-          extraConfig = {
-            Appearance = {
-              ColorScheme = "GreenOnBlack";
-            };
-
-            General = {
-              TerminalColumns = 117;
-              TerminalRows = 35;
-            };
-          };
-        };
-      };
-
-      programs.plasma = {
-        enable = true;
-
-        #
-        # Some high-level settings:
-        #
-        workspace = {
-          lookAndFeel = "org.kde.breezedark.desktop";
-          wallpaper = "/etc/htb/hackthebox.jpg";
-        };
-
-        hotkeys.commands."launch-konsole" = {
-          name = "Launch Konsole";
-          key = "Ctrl+Alt+T";
-          command = "konsole";
-        };
-
-        input.mice =  [
-          {
-            acceleration = 1.0;
-            accelerationProfile = "none";
-            name = builtins.readFile (pkgs.runCommand "mousename" { } "grep -B1 -A9 'Mouse' /proc/bus/input/devices | grep 'Name' | cut -d\= -f2 | cut -d'\"' -f2 > $out");
-            vendorId = builtins.readFile (pkgs.runCommand "vendor" { } "grep -B1 -A9 'Mouse' /proc/bus/input/devices | grep 'I:' | tr ' ' '\n' | grep -v 'I:' | grep -v 'Bus' | grep -v 'Version' | cut -d\= -f2 | head -n1 | tr -d '\n' > $out");
-            productId = builtins.readFile (pkgs.runCommand "product" { } "grep -B1 -A9 'Mouse' /proc/bus/input/devices | grep 'I:' | tr ' ' '\n' | grep -v 'I:' | grep -v 'Bus' | grep -v 'Version' | cut -d\= -f2 | tail -n1 | tr -d '\n' > $out");
-          }
+        imports = [
+          (import "${plasma-manager}/modules")
         ];
 
-        panels = [
+        services.home-manager.autoUpgrade.enable = config.system.autoUpgrade.enable;
+        services.home-manager.autoUpgrade.frequency = config.system.autoUpgrade.dates;
 
-          # Bottom panel: MacOS-like dock
-          {
-            location = "bottom";
-            height = 64;
-            floating = true;
-            alignment = "center";
-            lengthMode = "fit";
-            widgets = [
-              #
-              {
-                iconTasks = {
-                  launchers = [
-                    "applications:systemsettings.desktop"
-                    "applications:org.kde.discover.desktop"
-                    "applications:org.kde.dolphin.desktop"
-                    "applications:org.kde.konsole.desktop"
-                    "applications:google-chrome.desktop"
-                    "applications:org.kde.kate.desktop"
-                    "applications:code.desktop"
-                    "applications:Eclipse.desktop"
-                    "applications:discord-canary.desktop"
-                    "applications:burpsuite.desktop"
-                    "applications:zap.desktop"
-                  ];
-                };
-              }
-            ];
-            hiding = "none";
-          }
+        home.file."Desktop/Installation Instructions.txt".text = ''
+          To install system, open a terminal (Konsole) window and run: sudo /etc/htb/install.sh DEVICE TIME_ZONE_CONTINENT TIME_ZONE_CITY LOCALE FILE_SYSTEM USERNAME NICKNAME HOSTNAME
 
-          # Top panel: Kickoff, app name, global menu, system tray
-          {
-            location = "top";
-            height = 32;
-            floating = true;
-            widgets = [
-              {
-                name = "org.kde.plasma.kickoff";
-                config = {
-                  General = {
-                    icon = "/etc/htb/start-here.svg";
-                    alphaSort = true;
+          where:
+          * DEVICE is the device to install to,
+          * TIME_ZONE_CONTINENT is the part of your time zone identifier before the slash,
+          * TIME_ZONE_CITY is the part of your time zone identifier after the slash,
+          * LOCALE is your language locale identifier,
+          * FILE_SYSTEM is the file system you intend to use to format DEVICE,
+          * USERNAME is your username,
+          * NICKNAME is your properly capitalized and spaced real name,
+          * and HOSTNAME is what your computer will call itself on the network.
+
+          Example: sudo /etc/htb/install.sh /dev/sda America Los_Angeles "en_US.UTF-8" btrfs someuser "Some User" some-host
+        '';
+
+        programs.konsole = {
+          enable = true;
+          defaultProfile = "HTB";
+          profiles."HTB" = {
+
+            font = {
+              name = "Monospace";
+              size = 12;
+            };
+
+            extraConfig = {
+              Appearance = {
+                ColorScheme = "GreenOnBlack";
+              };
+
+              General = {
+                TerminalColumns = 117;
+                TerminalRows = 35;
+              };
+            };
+          };
+        };
+
+        programs.plasma = {
+          enable = true;
+
+          #
+          # Some high-level settings:
+          #
+          workspace = {
+            lookAndFeel = "org.kde.breezedark.desktop";
+            wallpaper = "/etc/htb/hackthebox.jpg";
+          };
+
+          hotkeys.commands."launch-konsole" = {
+            name = "Launch Konsole";
+            key = "Ctrl+Alt+T";
+            command = "konsole";
+          };
+
+          input.mice =  [
+            {
+              acceleration = 1.0;
+              accelerationProfile = "none";
+              name = builtins.readFile (pkgs.runCommand "mousename" { } "grep -B1 -A9 'Mouse' /proc/bus/input/devices | grep 'Name' | cut -d\= -f2 | cut -d'\"' -f2 > $out");
+              vendorId = builtins.readFile (pkgs.runCommand "vendor" { } "grep -B1 -A9 'Mouse' /proc/bus/input/devices | grep 'I:' | tr ' ' '\n' | grep -v 'I:' | grep -v 'Bus' | grep -v 'Version' | cut -d\= -f2 | head -n1 | tr -d '\n' > $out");
+              productId = builtins.readFile (pkgs.runCommand "product" { } "grep -B1 -A9 'Mouse' /proc/bus/input/devices | grep 'I:' | tr ' ' '\n' | grep -v 'I:' | grep -v 'Bus' | grep -v 'Version' | cut -d\= -f2 | tail -n1 | tr -d '\n' > $out");
+            }
+          ];
+
+          panels = [
+
+            # Bottom panel: MacOS-like dock
+            {
+              location = "bottom";
+              height = 64;
+              floating = true;
+              alignment = "center";
+              lengthMode = "fit";
+              widgets = [
+                #
+                {
+                  iconTasks = {
+                    launchers = [
+                      "applications:systemsettings.desktop"
+                      "applications:org.kde.discover.desktop"
+                      "applications:org.kde.dolphin.desktop"
+                      "applications:org.kde.konsole.desktop"
+                      "applications:google-chrome.desktop"
+                      "applications:org.kde.kate.desktop"
+                      "applications:code.desktop"
+                      "applications:Eclipse.desktop"
+                      "applications:discord-canary.desktop"
+                      "applications:burpsuite.desktop"
+                      "applications:zap.desktop"
+                    ];
                   };
-                };
-              }
-              {
-                applicationTitleBar = {
-                  behavior = {
-                    activeTaskSource = "activeTask";
-                  };
-                  layout = {
-                    elements = [ "windowTitle" ];
-                    horizontalAlignment = "left";
-                    showDisabledElements = "deactivated";
-                    verticalAlignment = "center";
-                  };
-                  overrideForMaximized.enable = false;
-                  titleReplacements = [
-                    {
-                      type = "regexp";
-                      originalTitle = "^Brave Web Browser$";
-                      newTitle = "Brave";
-                    }
-                    {
-                      type = "regexp";
-                      originalTitle = ''\\bDolphin\\b'';
-                      newTitle = "File Manager";
-                    }
-                  ];
-                  windowTitle = {
-                    font = {
-                      bold = true;
-                      fit = "fixedSize";
-                      size = 12;
+                }
+              ];
+              hiding = "none";
+            }
+
+            # Top panel: Kickoff, app name, global menu, system tray
+            {
+              location = "top";
+              height = 32;
+              floating = true;
+              widgets = [
+                {
+                  name = "org.kde.plasma.kickoff";
+                  config = {
+                    General = {
+                      icon = "/etc/htb/start-here.svg";
+                      alphaSort = true;
                     };
-                    hideEmptyTitle = true;
-                    margins = {
-                      bottom = 0;
-                      left = 10;
-                      right = 5;
-                      top = 0;
+                  };
+                }
+                {
+                  applicationTitleBar = {
+                    behavior = {
+                      activeTaskSource = "activeTask";
                     };
-                    source = "appName";
+                    layout = {
+                      elements = [ "windowTitle" ];
+                      horizontalAlignment = "left";
+                      showDisabledElements = "deactivated";
+                      verticalAlignment = "center";
+                    };
+                    overrideForMaximized.enable = false;
+                    titleReplacements = [
+                      {
+                        type = "regexp";
+                        originalTitle = "^Brave Web Browser$";
+                        newTitle = "Brave";
+                      }
+                      {
+                        type = "regexp";
+                        originalTitle = ''\\bDolphin\\b'';
+                        newTitle = "File Manager";
+                      }
+                    ];
+                    windowTitle = {
+                      font = {
+                        bold = true;
+                        fit = "fixedSize";
+                        size = 12;
+                      };
+                      hideEmptyTitle = true;
+                      margins = {
+                        bottom = 0;
+                        left = 10;
+                        right = 5;
+                        top = 0;
+                      };
+                      source = "appName";
+                    };
                   };
-                };
-              }
-              "org.kde.plasma.appmenu"
-              "org.kde.plasma.panelspacer"
-              {
-                digitalClock = {
-                  date.enable = false;
-                  calendar.firstDayOfWeek = "sunday";
-                  time = {
-                    format = "24h";
-                    showSeconds = "always";
+                }
+                "org.kde.plasma.appmenu"
+                "org.kde.plasma.panelspacer"
+                {
+                  digitalClock = {
+                    date.enable = false;
+                    calendar.firstDayOfWeek = "sunday";
+                    time = {
+                      format = "24h";
+                      showSeconds = "always";
+                    };
                   };
-                };
-              }
-              "org.kde.plasma.panelspacer"
-              {
-                systemTray.items = {
-                  shown = [
-                    "org.kde.plasma.battery"
-                    "org.kde.plasma.bluetooth"
-                    "org.kde.plasma.networkmanagement"
-                    "org.kde.plasma.volume"
-                  ];
-                };
-              }
-            ];
-          }
-        ];
+                }
+                "org.kde.plasma.panelspacer"
+                {
+                  systemTray.items = {
+                    shown = [
+                      "org.kde.plasma.battery"
+                      "org.kde.plasma.bluetooth"
+                      "org.kde.plasma.networkmanagement"
+                      "org.kde.plasma.volume"
+                    ];
+                  };
+                }
+              ];
+            }
+          ];
 
-        powerdevil = {
-          AC = {
-            powerButtonAction = "shutDown";
-            autoSuspend = {
-              action = "nothing";
+          powerdevil = {
+            AC = {
+              powerButtonAction = "shutDown";
+              autoSuspend = {
+                action = "nothing";
+              };
+              turnOffDisplay = {
+                idleTimeout = "never";
+              };
+              dimDisplay = {
+                enable = false;
+              };
+              displayBrightness = 100;
+              powerProfile = "performance";
             };
-            turnOffDisplay = {
-              idleTimeout = "never";
+
+            battery = {
+              powerButtonAction = "sleep";
+              whenSleepingEnter = "standbyThenHibernate";
             };
-            dimDisplay = {
-              enable = false;
+            lowBattery = {
+              whenLaptopLidClosed = "hibernate";
             };
-            displayBrightness = 100;
-            powerProfile = "performance";
           };
 
-          battery = {
-            powerButtonAction = "sleep";
-            whenSleepingEnter = "standbyThenHibernate";
+          kscreenlocker = {
+            autoLock = false;
+            lockOnResume = false;
+            lockOnStartup = false;
+            timeout = null;
           };
-          lowBattery = {
-            whenLaptopLidClosed = "hibernate";
+
+          #
+          # Some mid-level settings:
+          #
+          shortcuts = {
+            ksmserver = {
+              "Lock Session" = [
+                "Screensaver"
+                "Meta+Ctrl+Alt+L"
+              ];
+            };
+
+            kwin = {
+              "Expose" = "Meta+,";
+              "Switch Window Down" = "Meta+J";
+              "Switch Window Left" = "Meta+H";
+              "Switch Window Right" = "Meta+L";
+              "Switch Window Up" = "Meta+K";
+            };
           };
         };
-
-        kscreenlocker = {
-          autoLock = false;
-          lockOnResume = false;
-          lockOnStartup = false;
-          timeout = null;
-        };
-
-        #
-        # Some mid-level settings:
-        #
-        shortcuts = {
-          ksmserver = {
-            "Lock Session" = [
-              "Screensaver"
-              "Meta+Ctrl+Alt+L"
-            ];
-          };
-
-          kwin = {
-            "Expose" = "Meta+,";
-            "Switch Window Down" = "Meta+J";
-            "Switch Window Left" = "Meta+H";
-            "Switch Window Right" = "Meta+L";
-            "Switch Window Up" = "Meta+K";
-          };
-        };
-      };
-    };
+      }
+    ];
 
     # TODO: figure out how to do this without causing infinite recursion
     # sharedModules = [ config.home-manager.users."${systemUser}" ];
