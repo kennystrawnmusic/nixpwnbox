@@ -229,6 +229,7 @@ in
       "sd_mod"
       "kvm-intel"
     ];
+    kernelModules = [ "nvidia" ];
   };
   boot.blacklistedKernelModules = [ "nouveau" ];
   boot.plymouth.enable = true;
@@ -425,7 +426,7 @@ in
     (libunistring.overrideAttrs(_: rec {
       src = pkgs.fetchurl {
         url = "https://ftp.gnu.org/gnu/libunistring/libunistring-latest.tar.gz";
-        sha256 = "sha256-/W1WYvpwZIfEg0mnWLV7wUnOlOxsMGJOyf3Ec86rvI4=";
+        sha256 = "sha256-ElQq12GUcO/ZWmIxdNzUs2TySDyvcIxr7oN8tTpUy50=";
       };
     }))
 
@@ -1074,9 +1075,9 @@ in
     bytecode-viewer
     patchelf
     radare2
-    # cutter Build failure
-    retdec
-    snowman
+    # cutter # Build failure
+#     retdec # Build failure
+#     snowman # Build failure
     valgrind
     yara
 
