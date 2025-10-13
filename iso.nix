@@ -15,6 +15,37 @@ let
   systemLang = "en_US.UTF-8";
   gitName = "Live System User";
   gitEmail = "changethis@example.com";
+
+  # Custom package prep
+  prepkgs = import <nixpkgs> { };
+
+  impacketsrc = builtins.fetchGit {
+    url = "https://github.com/fortra/impacket";
+    ref = "master";
+  };
+
+  setupPy = builtins.readFile "${impacketsrc}/setup.py";
+  lines   = prepkgs.lib.splitString "\n" setupPy;
+
+  getVal = name:
+    let
+      line = prepkgs.lib.findFirst (l: prepkgs.lib.hasInfix "${name}" l) "" lines;
+      asNum = builtins.match "^.*${name}[[:space:]]*=[[:space:]]*([0-9]+).*" line;
+      asStr = builtins.match "^.*${name}[[:space:]]*=[[:space:]]*['\"]([^'\"]+)['\"].*" line;
+    in if asNum != null then builtins.elemAt asNum 0
+       else if asStr != null then builtins.elemAt asStr 0
+       else null;
+
+  maj   = getVal "VER_MAJOR";
+  min   = getVal "VER_MINOR";
+  patch = getVal "VER_MAINT";
+  pre   = getVal "VER_PREREL";
+
+  baseVersion = "${maj}.${min}.${patch}";
+  impacketversion =
+    if pre != null && pre != "" && pre != "final"
+    then "${baseVersion}.${pre}"   # upstream often appends ".dev", etc.
+    else baseVersion;
 in
 {
   config,
@@ -223,15 +254,14 @@ in
   # What to do in case of OOM condition
   systemd.oomd = {
     enableRootSlice = true;
-    extraConfig = {
+    settings.OOM = {
       DefaultMemoryPressureDurationSec = "2s";
     };
   };
 
-#   boot.supportedFilesystems = [
-#     config.fileSystems."/".fsType
-#     config.fileSystems."/boot".fsType
-#   ];
+  boot.supportedFilesystems = lib.mkForce [
+    "btrfs" "ext4" "xfs" "f2fs" "vfat" "ntfs" "reiserfs"
+  ];
 
   networking.hostName = "${systemHostname}";
 
@@ -245,7 +275,7 @@ in
   i18n.defaultLocale = "${systemLang}";
 
   # Best hardware support without breaking things
-  boot.kernelPackages = pkgs.linuxPackages_zen;
+  boot.kernelPackages = lib.mkOverride 0 pkgs.linuxPackages_zen;
 
   i18n.extraLocaleSettings = {
     LC_ADDRESS = "${systemLang}";
@@ -307,7 +337,7 @@ in
 
   # Enable sound with pipewire.
 #   sound.enable = true;
-  hardware.pulseaudio.enable = lib.mkForce false;
+  services.pulseaudio.enable = lib.mkForce false;
   security.rtkit.enable = true;
   services.pipewire = {
     enable = true;
@@ -522,7 +552,7 @@ in
     kdePackages.kalzium
     kdePackages.kamera
     kdePackages.kanagram
-    kdePackages.kapidox
+#     kdePackages.kapidox # Marked broken
     kdePackages.kapman
     kdePackages.kapptemplate
     kdePackages.karchive
@@ -897,7 +927,6 @@ in
     kdePackages.sonnet
     kdePackages.spacebar
     kdePackages.spectacle
-    kdePackages.stdenv
     kdePackages.step
     kdePackages.svgpart
     kdePackages.sweeper
@@ -922,8 +951,6 @@ in
     kdePackages.zxing-cpp
 
     # Calamares dependencies
-    libsForQt5.kpmcore
-    calamares-nixos
     glibcLocales
 
     # Copy/paste from terminal
@@ -1055,7 +1082,7 @@ in
 
     # Pentesting, Part 10: Packet Sniffers
     bettercap
-    dsniff
+#     dsniff # Build failure
     mitmproxy
     rshijack
     sipp
@@ -1094,7 +1121,7 @@ in
     kismet
     mfcuk
     mfoc
-    multimon-ng
+#     multimon-ng # Build failure
     redfang
     wifite2
     wirelesstools
@@ -1111,10 +1138,10 @@ in
     powerview
     (python3Packages.buildPythonPackage rec { # Bleeding edge Impacket
       pname = "impacket";
-      version = builtins.readFile(pkgs.runCommand "impacketversion" { } "export PATH=${pkgs.python3}/bin:$PATH; git clone https://github.com/fortra/impacket; cd impacket; python3 -m venv .impacket; source .impacket/bin/activate; python3 -c 'from impacket import version; print(version.BANNER)' | cut -d ' ' -f2 > $out; deactivate; cd ..; rm -rf impacket";);
+      version = impacketversion;
       pyproject = true;
 
-      disabled = pypkgs.pythonOlder "3.8";
+      disabled = python3Packages.pythonOlder "3.8";
 
       src = builtins.fetchGit {
         url = "https://github.com/fortra/impacket";
@@ -1123,9 +1150,9 @@ in
 
       pythonRelaxDeps = [ "pyopenssl" ];
 
-      build-system = [ pypkgs.setuptools ];
+      build-system = [ python3Packages.setuptools ];
 
-      dependencies = with pypkgs; [
+      dependencies = with python3Packages; [
         charset-normalizer
         dsinternals
         flask
@@ -1139,7 +1166,7 @@ in
         six
       ];
 
-      nativeCheckInputs = [ pypkgs.pytestCheckHook ];
+      nativeCheckInputs = [ python3Packages.pytestCheckHook ];
 
       pythonImportsCheck = [ "impacket" ];
 
@@ -1242,7 +1269,7 @@ in
     })
 
     # Custom packages, Part 3: Sliver C2
-    ({ lib, stdenvNoCC, fetchurl }:
+    (pkgs.callPackage ({ lib, stdenvNoCC, fetchurl }:
     let
       version = "1.5.43";
 
@@ -1284,7 +1311,7 @@ in
         maintainers = [];
         mainProgram = "sliver-server";
       };
-    })
+    }) { })
 
     # Custom packages, Part 4: Custom Calamares configuration
     (stdenv.mkDerivation (finalAttrs: {
@@ -1523,7 +1550,7 @@ in
     useGlobalPkgs = true;
 
     sharedModules = [
-      { stdenv, fetchurl, lib, pkgs, ... }: {
+      ({ stdenv, fetchurl, lib, pkgs, ... }: {
         home.stateVersion = config.system.stateVersion;
 
         imports = [
@@ -1766,7 +1793,7 @@ in
             };
           };
         };
-      }
+      })
     ];
 
     # TODO: figure out how to do this without causing infinite recursion
