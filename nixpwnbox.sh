@@ -9,12 +9,12 @@ if [ $UID -ne 0 ]; then
 	exit 1
 fi
 
-args=($1 $2 $3 $4 $5 $6 $7 $8)
+args=($1 $2 $3 $4 $5 $6 $7 $8 $9)
 
-if [ ${#args[@]} -lt 8 ]; then
+if [ ${#args[@]} -lt 9 ]; then
 
 	cat <<-EOF
-		Usage: nixpwnbox.sh DEVICE TIME_ZONE_CONTINENT TIME_ZONE_CITY LOCALE FILE_SYSTEM USERNAME NICKNAME HOSTNAME
+		Usage: nixpwnbox.sh DEVICE TIME_ZONE_CONTINENT TIME_ZONE_CITY LOCALE FILE_SYSTEM USERNAME NICKNAME HOSTNAME GIT_EMAIL
 
 		where:
 		 * DEVICE is the device to install to,
@@ -24,9 +24,10 @@ if [ ${#args[@]} -lt 8 ]; then
 		 * FILE_SYSTEM is the file system you intend to use to format DEVICE,
 		 * USERNAME is your username,
 		 * NICKNAME is your properly capitalized and spaced real name,
-		 * and HOSTNAME is what your computer will call itself on the network.
+		 * HOSTNAME is what your computer will call itself on the network,
+		 * and GIT_EMAIL is the email address to configure Git with.
 
-		Example: sudo ./nixpwnbox.sh /dev/sda America Los_Angeles "en_US.UTF-8" btrfs someuser "Some User" some-host
+		Example: sudo ./nixpwnbox.sh /dev/sda America Los_Angeles "en_US.UTF-8" btrfs someuser "Some User" some-host changethis@example.com
 
 	EOF
 
@@ -45,6 +46,7 @@ file_system=$5
 user=$6
 nickname=$7
 hostname=$8
+gitemail=$9
 
 # Partitions
 sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk $dest_device
@@ -104,8 +106,29 @@ fi
 mkdir /mnt/boot
 mount -t vfat $partition1 -o umask=0077 /mnt/boot
 
+# Count how many times 'options =' appears inside fileSystems."/": { ... };
+count_fs_root_options() {
+  awk '
+    /fileSystems\."\/"[[:space:]]*=[[:space:]]*\{/ , /^\s*};/ {
+      n += gsub(/(^|[[:space:]])options[[:space:]]*=/, "&")
+    }
+    END { print n+0 }
+  ' /mnt/etc/nixos/hardware-configuration.nix
+}
+
+# Debug helper to show any lines with options= inside that block (with numbers)
+show_fs_root_options() {
+  nl -ba /mnt/etc/nixos/hardware-configuration.nix |
+  awk '
+    /fileSystems\."\/"[[:space:]]*=[[:space:]]*\{/ , /^\s*};/ {
+      if ($0 ~ /(^|[[:space:]])options[[:space:]]*=/) print
+    }'
+}
+
+set -euo pipefail
+
 # Install nixpkgs on non-NixOS systems
-if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ]; then
+if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ] || [ ! "$(which nix-env)" =~ ".*/bin/nix-env$" ]; then
   bash <(curl -L https://nixos.org/nix/install) --no-channel-add --daemon --yes
   source /etc/bashrc || source /etc/bash.bashrc
   nix-channel --add https://github.com/NixOS/nixpkgs/archive/master.tar.gz nixpkgs
@@ -122,6 +145,7 @@ sed -i "s/@@tz-major@@\/@@tz-minor@@/$tz_major\/$tz_minor/g" /mnt/etc/nixos/conf
 sed -i "s/@@lang@@/$locale/g" /mnt/etc/nixos/configuration.nix
 sed -i "s/@@fullname@@/$nickname/g" /mnt/etc/nixos/configuration.nix
 sed -i "s/@@hostname@@/$hostname/g" /mnt/etc/nixos/configuration.nix
+sed -i "s/@@email@@/$gitemail/g" /mnt/etc/nixos/configuration.nix
 
 if [ "$file_system" != "btrfs" ]; then
   sed -i "s/btrfs/$file_system/g" /mnt/etc/nixos/configuration.nix
@@ -129,7 +153,18 @@ fi
 
 # Actually install the target system
 nixos-generate-config --root /mnt
-nixos-install -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/master.tar.gz -I nixos=https://github.com/NixOS/nixpkgs/archive/master.tar.gz
+
+
+count="$(count_fs_root_options || echo 0)"
+if [ "${count}" -le 1 ]; then
+  nixos-install \
+    -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/master.tar.gz \
+    -I nixos=https://github.com/NixOS/nixpkgs/archive/master.tar.gz
+else
+  echo "Found ${count} 'options =' entries in fileSystems.\"/\" block:"
+  show_fs_root_options
+  exit 1
+fi
 
 # Cleanup if on a non-NixOS host
 if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ]; then

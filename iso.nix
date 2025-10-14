@@ -95,6 +95,9 @@ in
             "ftp://ftp.funet.fi/pub/mirrors/ftp.gnu.org/gnu/"
           ];
         });
+
+        # Force CD/DVD ISO to use binary Firefox to cut build times
+        final.firefox = prev.firefox-bin;
       })
     ];
 
@@ -1357,6 +1360,8 @@ in
       };
     }))
   ];
+
+
 
   # PAM configuration
   security.pam = {

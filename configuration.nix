@@ -14,6 +14,47 @@ let
   systemTime = "@@tz-major@@/@@tz-minor@@";
   systemLang = "@@lang@@";
   gitName = "@@fullname@@";
+  gitEmail = "@@email@@";
+
+  # Custom package prep
+  prepkgs = import <nixpkgs> { };
+
+  impacketsrc = builtins.fetchGit {
+    url = "https://github.com/fortra/impacket.git";
+    ref = "master";
+  };
+
+  setupPy = builtins.readFile "${impacketsrc}/setup.py";
+  lines   = prepkgs.lib.splitString "\n" setupPy;
+
+  getVal = name:
+    let
+      line = prepkgs.lib.findFirst (l: prepkgs.lib.hasInfix "${name}" l) "" lines;
+      asNum = builtins.match "^.*${name}[[:space:]]*=[[:space:]]*([0-9]+).*" line;
+      asStr = builtins.match "^.*${name}[[:space:]]*=[[:space:]]*['\"]([^'\"]+)['\"].*" line;
+    in if asNum != null then builtins.elemAt asNum 0
+       else if asStr != null then builtins.elemAt asStr 0
+       else null;
+
+  maj   = getVal "VER_MAJOR";
+  min   = getVal "VER_MINOR";
+  patch = getVal "VER_MAINT";
+  pre   = getVal "VER_PREREL";
+
+  baseVersion = "${maj}.${min}.${patch}";
+
+  lmd          = prepkgs.srcInfo.lastModifiedDate or null;
+  shortRev     = prepkgs.lib.substring 0 7 prepkgs.srcInfo.rev;
+  ymd          = if lmd != null then builtins.substring 0 10 lmd else null;            # "YYYY-MM-DD"
+  hms          = if lmd != null then builtins.substring 11 8 lmd else null;            # "HH:MM:SS"
+  ymdCompact   = if ymd != null then builtins.replaceStrings [ "-" ] [ "" ] ymd else null;  # "YYYYMMDD"
+  hmsCompact   = if hms != null then builtins.replaceStrings [ ":" ] [ "" ] hms else null;  # "HHMMSS"
+  localSuffix  = if ymdCompact != null && hmsCompact != null then "+${ymdCompact}.${hmsCompact}.${shortRev}" else "";
+
+  impacketversion =
+    if pre != null && pre != "" && pre != "final"
+    then "${baseVersion}.${pre}${localSuffix}"
+    else "${baseVersion}";
 in
 {
   config,
@@ -126,22 +167,22 @@ in
   };
 
   # Git configuration
-#   programs.git.config = {
-#     user = {
-#       name = "${gitName}";
-#       email = "Add your email address here";
-#     };
-#     http = {
-#       postBuffer = 1048576000;
-#     };
-#     https = {
-#       postBuffer = 1048576000;
-#     };
-#   };
+  programs.git.config = {
+    user = {
+      name = "${gitName}";
+      email = "${gitEmail}";
+    };
+    http = {
+      postBuffer = 1048576000;
+    };
+    https = {
+      postBuffer = 1048576000;
+    };
+  };
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
-  boot.loader.timeout = 0;
+  boot.loader.timeout = lib.mkOverride 0 0;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.efi.efiSysMountPoint = "/boot";
 
@@ -166,6 +207,7 @@ in
       "sd_mod"
       "kvm-intel"
     ];
+    kernelModules = [ "nvidia" ];
   };
   boot.blacklistedKernelModules = [ "nouveau" ];
   boot.plymouth.enable = true;
@@ -191,15 +233,10 @@ in
   # What to do in case of OOM condition
   systemd.oomd = {
     enableRootSlice = true;
-    extraConfig = {
+    settings.OOM = {
       DefaultMemoryPressureDurationSec = "2s";
     };
   };
-
-  boot.supportedFilesystems = [
-    config.fileSystems."/".fsType
-    config.fileSystems."/boot".fsType
-  ];
 
   networking.hostName = "${systemHostname}";
 
@@ -213,7 +250,7 @@ in
   i18n.defaultLocale = "${systemLang}";
 
   # Best hardware support without breaking things
-  boot.kernelPackages = pkgs.linuxPackages_zen;
+  boot.kernelPackages = lib.mkOverride 0 pkgs.linuxPackages_zen;
 
   i18n.extraLocaleSettings = {
     LC_ADDRESS = "${systemLang}";
@@ -226,6 +263,9 @@ in
     LC_TELEPHONE = "${systemLang}";
     LC_TIME = "${systemLang}";
   };
+
+  # Allow override of locale in foreign countries
+  i18n.supportedLocales = [ "all" ];
 
   # Enable the X11 windowing system.
   services.xserver = {
@@ -272,7 +312,7 @@ in
 
   # Enable sound with pipewire.
 #   sound.enable = true;
-  services.pulseaudio.enable = lib.mkOverride 0 false;
+  services.pulseaudio.enable = lib.mkForce false;
   security.rtkit.enable = true;
   services.pipewire = {
     enable = true;
@@ -339,6 +379,14 @@ in
     }
   ];
 
+  environment.variables = {
+    RUSTUP_HOME = "/opt/rust";
+    CARGO_HOME = "/opt/rust";
+    PIPX_HOME = "/opt/pipx";
+    PIPX_GLOBAL_HOME = "/opt/pipx";
+    PIPX_BIN_DIR = "/usr/local/bin";
+  };
+
   environment.systemPackages = with pkgs; [
     # Essentials
     git
@@ -352,7 +400,7 @@ in
     (libunistring.overrideAttrs(_: rec {
       src = pkgs.fetchurl {
         url = "https://ftp.gnu.org/gnu/libunistring/libunistring-latest.tar.gz";
-        sha256 = "sha256-/W1WYvpwZIfEg0mnWLV7wUnOlOxsMGJOyf3Ec86rvI4=";
+        sha256 = "sha256-ElQq12GUcO/ZWmIxdNzUs2TySDyvcIxr7oN8tTpUy50=";
       };
     }))
 
@@ -479,7 +527,7 @@ in
     kdePackages.kalzium
     kdePackages.kamera
     kdePackages.kanagram
-    kdePackages.kapidox
+#     kdePackages.kapidox # Marked broken
     kdePackages.kapman
     kdePackages.kapptemplate
     kdePackages.karchive
@@ -854,7 +902,6 @@ in
     kdePackages.sonnet
     kdePackages.spacebar
     kdePackages.spectacle
-#    kdePackages.stdenv
     kdePackages.step
     kdePackages.svgpart
     kdePackages.sweeper
@@ -877,6 +924,9 @@ in
     kdePackages.yakuake
     kdePackages.zanshin
     kdePackages.zxing-cpp
+
+    # Calamares dependencies
+    glibcLocales
 
     # Copy/paste from terminal
     wl-clipboard
@@ -933,7 +983,7 @@ in
     extundelete
     ghidra-bin
     git
-#    p0f
+    p0f
     pdf-parser
     regripper
     sleuthkit
@@ -990,9 +1040,7 @@ in
     john
     phrasendrescher
     thc-hydra
-    netexec
     medusa
-    kerbrute
     responder
 
     # Pentesting, Part 9: Disassemblers
@@ -1001,15 +1049,15 @@ in
     bytecode-viewer
     patchelf
     radare2
-    # cutter Build failure
-    retdec
-    snowman
+    # cutter # Build failure
+#     retdec # Build failure
+#     snowman # Build failure
     valgrind
     yara
 
     # Pentesting, Part 10: Packet Sniffers
     bettercap
-    dsniff
+#     dsniff # Build failure
     mitmproxy
     rshijack
     sipp
@@ -1048,7 +1096,7 @@ in
     kismet
     mfcuk
     mfoc
-    multimon-ng
+#     multimon-ng # Build failure
     redfang
     wifite2
     wirelesstools
@@ -1065,10 +1113,10 @@ in
     powerview
     (python3Packages.buildPythonPackage rec { # Bleeding edge Impacket
       pname = "impacket";
-      version = builtins.readFile(pkgs.runCommand "impacketversion" { } "export PATH=${pkgs.python3}/bin:$PATH; git clone https://github.com/fortra/impacket; cd impacket; python3 -m venv .impacket; source .impacket/bin/activate; python3 -c 'from impacket import version; print(version.BANNER)' | cut -d ' ' -f2 > $out; deactivate; cd ..; rm -rf impacket";);
+      version = impacketversion;
       pyproject = true;
 
-      disabled = pypkgs.pythonOlder "3.8";
+      disabled = python3Packages.pythonOlder "3.8";
 
       src = builtins.fetchGit {
         url = "https://github.com/fortra/impacket";
@@ -1077,9 +1125,9 @@ in
 
       pythonRelaxDeps = [ "pyopenssl" ];
 
-      build-system = [ pypkgs.setuptools ];
+      build-system = [ python3Packages.setuptools ];
 
-      dependencies = with pypkgs; [
+      dependencies = with python3Packages; [
         charset-normalizer
         dsinternals
         flask
@@ -1093,7 +1141,7 @@ in
         six
       ];
 
-      nativeCheckInputs = [ pypkgs.pytestCheckHook ];
+      nativeCheckInputs = [ python3Packages.pytestCheckHook ];
 
       pythonImportsCheck = [ "impacket" ];
 
@@ -1196,7 +1244,7 @@ in
     })
 
     # Custom packages, Part 3: Sliver C2
-    ({ lib, stdenvNoCC, fetchurl }:
+    (pkgs.callPackage ({ lib, stdenvNoCC, fetchurl }:
     let
       version = "1.5.43";
 
@@ -1238,8 +1286,44 @@ in
         maintainers = [];
         mainProgram = "sliver-server";
       };
-    })
+    }) { })
+
+    # Custom packages, Part 4: Custom Calamares configuration
+    (pkgs.stdenv.mkDerivation (finalAttrs: {
+      pname = "calamares-nixpwnbox";
+      version = "0.3.19";
+
+      src = builtins.fetchGit {
+        url = "https://github.com/kennystrawnmusic/calamares-nixpwnbox";
+        ref = "calamares";
+      };
+
+      installPhase = ''
+        runHook preInstall
+        mkdir -p $out/{lib,share}/calamares
+        cp -r modules $out/lib/calamares/
+        cp -r config/* $out/share/calamares/
+        cp -r branding $out/share/calamares/
+        runHook postInstall
+      '';
+
+      meta = with lib; {
+        description = "Calamares modules for NixOS (NixPwnBox fork)";
+        homepage = "https://github.com/kennystrawnmusic/calamares-nixpwnbox";
+        license = with licenses; [
+          gpl3Plus
+          bsd2
+          cc-by-40
+          cc-by-sa-40
+          cc0
+        ];
+        maintainers = with maintainers; [ vlinkz ];
+        platforms = platforms.linux;
+      };
+    }))
   ];
+
+
 
   # PAM configuration
   security.pam = {
@@ -1292,8 +1376,6 @@ in
 
     # Ensure that Rust is installed in the correct (sysmtem-wide) location
     export CARGO_BUILD_JOBS=$(nproc)
-    export RUSTUP_HOME=/opt/rust
-    export CARGO_HOME=/opt/rust
 
     # Add Rust to $PATH if installed
     if [ -f /opt/rust/env ]; then
@@ -1341,6 +1423,9 @@ in
 
     # Clean ISO images
     alias isoclean="sudo find /nix/store -type d -iname \"*.iso\" -exec nix-store --delete --ignore-liveness {} \;; sudo nix-collect-garbage -d"
+
+    # Add /etc/htb to $PATH to make installation easier
+    export PATH=/etc/htb:$PATH
 
     # Shell functions for saving time with FreeRDP connections
     shortfreerdp() {
@@ -1442,7 +1527,7 @@ in
     useGlobalPkgs = true;
 
     sharedModules = [
-      { stdenv, fetchurl, lib, pkgs, ... }: {
+      ({ stdenv, fetchurl, lib, pkgs, ... }: {
         home.stateVersion = config.system.stateVersion;
 
         imports = [
@@ -1685,7 +1770,7 @@ in
             };
           };
         };
-      }
+      })
     ];
 
     # TODO: figure out how to do this without causing infinite recursion
