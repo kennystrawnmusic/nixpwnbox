@@ -127,6 +127,10 @@ in
 
     # Fetching from master Git branches is impossible otherwise
     require-sigs = false;
+
+    # Increase download buffer size to make this work properly
+    # when using a USB flash drive as an install destination
+    download-buffer-size = 4398046511104;
   };
 
   # Polkit (needed for editing files as root)
@@ -1352,7 +1356,7 @@ in
   };
 
   # Collect garbage after each automatic update
-  systemd.services."nixos-upgrade".postStart = "${pkgs.nix}/bin/nix-collect-garbage -d";
+  systemd.services."nixos-upgrade".postStop = "${pkgs.nix}/bin/nix-collect-garbage -d";
 
   # Memory compression
   zramSwap = {

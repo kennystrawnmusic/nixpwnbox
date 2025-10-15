@@ -48,82 +48,7 @@ nickname=$7
 hostname=$8
 gitemail=$9
 
-# Partitions
-sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk $dest_device
-	g # GPT
-	n
-		# default
-		# default
-	+512M
-	t # change partition type
-	1 # EFI System
-	n
-		# default
-		# default
-		# default
-	p
-	w
-EOF
-
-# Dependent Variables
-partitions=($(fdisk -l $dest_device | cut -d' ' -f1 | tail -n-2 | tr '\n' ' '))
-root_uuid=$(blkid | grep ${partitions[1]} | cut -d' ' -f6 | cut -d\" -f2)
-
-partition1=${partitions[0]}
-partition2=${partitions[1]}
-
-script_working_directory=$PWD
-
-# Formatting
-mkfs.vfat -F32 $partition1
-mkfs.$file_system -f $partition2
-
-if [ ! -d /mnt ]; then
-  mkdir /mnt
-fi
-
-# Mount points
-mount -t $file_system $partition2 /mnt
-
-if [ "$file_system" == "btrfs" ]
-then
-  cd /mnt
-  btrfs subvolume create '@'
-  btrfs subvolume create '@home'
-  cd $script_working_directory
-  umount -lf /mnt
-  mount -t $file_system -o subvol='@' $partition2 /mnt
-  mkdir /mnt/home
-  mount -t $file_system -o subvol='@home' $partition2 /mnt/home
-  cd $script_working_directory
-fi
-
-if [ $? -ne 0 ]; then
-  echo "Error: failed to mount file systems"
-  exit 1
-fi
-
-mkdir /mnt/boot
-mount -t vfat $partition1 -o umask=0077 /mnt/boot
-
-# Count how many times 'options =' appears inside fileSystems."/": { ... };
-count_fs_root_options() {
-  awk '
-    /fileSystems\."\/"[[:space:]]*=[[:space:]]*\{/ , /^\s*};/ {
-      n += gsub(/(^|[[:space:]])options[[:space:]]*=/, "&")
-    }
-    END { print n+0 }
-  ' /mnt/etc/nixos/hardware-configuration.nix
-}
-
-# Debug helper to show any lines with options= inside that block (with numbers)
-show_fs_root_options() {
-  nl -ba /mnt/etc/nixos/hardware-configuration.nix |
-  awk '
-    /fileSystems\."\/"[[:space:]]*=[[:space:]]*\{/ , /^\s*};/ {
-      if ($0 ~ /(^|[[:space:]])options[[:space:]]*=/) print
-    }'
-}
+./reformat.sh $dest_device
 
 set -euo pipefail
 
@@ -147,9 +72,24 @@ sed -i "s/@@fullname@@/$nickname/g" /mnt/etc/nixos/configuration.nix
 sed -i "s/@@hostname@@/$hostname/g" /mnt/etc/nixos/configuration.nix
 sed -i "s/@@email@@/$gitemail/g" /mnt/etc/nixos/configuration.nix
 
-if [ "$file_system" != "btrfs" ]; then
-  sed -i "s/btrfs/$file_system/g" /mnt/etc/nixos/configuration.nix
-fi
+# Count how many times 'options =' appears inside fileSystems."/": { ... };
+count_fs_root_options() {
+  awk '
+    /fileSystems\."\/"[[:space:]]*=[[:space:]]*\{/ , /^\s*};/ {
+      n += gsub(/(^|[[:space:]])options[[:space:]]*=/, "&")
+    }
+    END { print n+0 }
+  ' /mnt/etc/nixos/hardware-configuration.nix
+}
+
+# Debug helper to show any lines with options= inside that block (with numbers)
+show_fs_root_options() {
+  nl -ba /mnt/etc/nixos/hardware-configuration.nix |
+  awk '
+    /fileSystems\."\/"[[:space:]]*=[[:space:]]*\{/ , /^\s*};/ {
+      if ($0 ~ /(^|[[:space:]])options[[:space:]]*=/) print
+    }'
+}
 
 # Actually install the target system
 nixos-generate-config --root /mnt
@@ -163,7 +103,6 @@ if [ "${count}" -le 1 ]; then
 else
   echo "Found ${count} 'options =' entries in fileSystems.\"/\" block:"
   show_fs_root_options
-  exit 1
 fi
 
 # Cleanup if on a non-NixOS host
@@ -187,4 +126,4 @@ if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ]; then
 fi
 
 # Unmount target
-umount -lf /mnt/{boot,.}
+find /dev -regex "$(echo $dest_device | cut -d\/ -f3)[0-9]{1,}" -exec umount -lf {} \;
