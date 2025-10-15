@@ -22,8 +22,10 @@ fi
 # Generate the ISO image
 nix-build '<nixpkgs/nixos>' -A config.system.build.isoImage -I nixos-config=iso.nix
 
-# Copy ISO image to current working directory so it isn't lost when we clean up
-cp result/iso/*.iso .
+# Copy ISO image to current working directory on non-NixOS so it isn't lost when we clean up
+if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ]; then
+  cp result/iso/*.iso .
+fi
 
 # Cleanup if on a non-NixOS host
 sudo ./cleanup.sh
