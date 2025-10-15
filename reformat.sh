@@ -9,14 +9,17 @@ if [ $UID -ne 0 ]; then
 	exit 1
 fi
 
-if [ -z "$1" ]; then
+args=($1 $2)
+
+if [ ${#args[@]} -lt 2 ]; then
 	cat <<-EOF
-		Usage: reformat.sh DEVICE,
+		Usage: reformat.sh DEVICE FS,
 
 		where:
 		 * DEVICE is the device to format
+		 * FS is the file system to use
 
-		Example: sudo ./reformat.sh /dev/sda
+		Example: sudo ./reformat.sh /dev/sda btrfs
 
 	EOF
 
@@ -28,6 +31,7 @@ shopt -s extglob
 
 # Independent Variables
 dest_device=$1
+file_system=$2
 
 # Partitions
 sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk $dest_device
