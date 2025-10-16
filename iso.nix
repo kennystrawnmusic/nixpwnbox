@@ -1203,6 +1203,7 @@ in
     python3Packages.lsassy
     python3Packages.pypykatz
     python3Packages.pywerview
+    ruler
     samba
     sccmhunter
 

@@ -96,6 +96,9 @@ in
             "ftp://ftp.funet.fi/pub/mirrors/ftp.gnu.org/gnu/"
           ];
         });
+
+        # Force binary Firefox to cut build times
+        final.firefox = prev.firefox-bin;
       })
     ];
 
@@ -1169,6 +1172,7 @@ in
     python3Packages.lsassy
     python3Packages.pypykatz
     python3Packages.pywerview
+    ruler
     samba
     sccmhunter
 
@@ -1588,7 +1592,7 @@ in
           #
           workspace = {
             lookAndFeel = "org.kde.breezedark.desktop";
-            wallpaper = "/etc/htb/hackthebox.jpg";
+            wallpaper = desktopBackground;
           };
 
           hotkeys.commands."launch-konsole" = {

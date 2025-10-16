@@ -6,6 +6,8 @@
 ###########################################################
 
 if [ ! -f /etc/os-release ] || [ -z "$(grep 'NixOS' /etc/os-release)" ]; then
+  # Back up ISO images before continuing
+  cp -f result/iso/*.iso .
 
   # Disable nix-daemon services/sockets
   systemctl disable --now nix-daemon.socket nix-daemon.service
